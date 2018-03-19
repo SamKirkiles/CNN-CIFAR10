@@ -6,7 +6,6 @@ import copy as cp
 class CNN:
 	
 	_weights = {}
-	_caches = {}
 
 	### Convolution Parameters ###
 	conv_layers = 3
@@ -38,26 +37,10 @@ class CNN:
 		print("Batch Size: " + str(batch_size))
 		print("Epochs: " + str(epochs))
 
+		# we need method called update weights 
 		cost, caches = self.forward_propagate(model_inputs,self._weights)
 		gradients = self.backward_propagate(model_inputs,caches)
 
-	def verify_gradients(self,inputs,verbose=True):
-
-		cost, caches = self.forward_propagate(inputs,self._weights)
-		gradients = self.backward_propagate(inputs,caches)
-
-		if verbose:
-			print("Verifying gradients verbose:\n")
-
-		for key in self._weights:
-			approx = self.check_gradients(inputs,self._weights,key,self._weights[key].ndim)
-			calc = gradients[key].flat[0]
-
-			if verbose:
-				print("Approx " + key + ": " + str(approx))
-				print("Calulated " + key + ": " + str(calc))
-				print("Check Passed: " + str(np.isclose(approx,calc)))
-				print("\n")
 
 	def forward_propagate(self,model_inputs,weights):
 
@@ -126,12 +109,32 @@ class CNN:
 
 		return gradients
 
+
+	def verify_gradients(self,inputs,verbose=True):
+
+		cost, caches = self.forward_propagate(inputs,self._weights)
+		gradients = self.backward_propagate(inputs,caches)
+
+		if verbose:
+			print("Verifying gradients verbose:\n")
+
+		for key in self._weights:
+			approx = self.check_gradients(inputs,self._weights,key,self._weights[key].ndim)
+			calc = gradients[key].flat[0]
+
+			if verbose:
+				print("Approx " + key + ":    " + str(approx))
+				print("Calulated " + key + ": " + str(calc))
+				print("Check Passed: " + str(np.isclose(approx,calc)))
+				print("\n")
+
+
 	def check_gradients(self,inputs,weights,key,dims):
 
 		x = inputs['x']
 		y = inputs['y']
 
-		epsilon = 0.00001
+		epsilon = 0.000001
 
 		weights1 = cp.deepcopy(weights)
 		weights2 = cp.deepcopy(weights)
