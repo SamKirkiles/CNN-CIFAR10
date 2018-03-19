@@ -2,10 +2,15 @@ from .layers import conv_forward_naive, conv_back_naive, relu,relu_back, max_poo
 from .layers_fast import conv_fast, conv_fast_back
 import numpy as np
 import copy as cp
+import math
 
 class CNN:
 	
 	_weights = {}
+
+	_rms_velocity = {}
+	_momentum_velocity = {}
+
 
 	### Convolution Parameters ###
 	conv_layers = 3
@@ -30,16 +35,28 @@ class CNN:
 
 		
 
-	def train(self,model_inputs,lr,epochs,batch_size):
+	def train(self,model_inputs,lr):
 
 		print("\nTraining...")
 		print("Learning Rate" + str(lr))
-		print("Batch Size: " + str(batch_size))
-		print("Epochs: " + str(epochs))
 
-		# we need method called update weights 
-		cost, caches = self.forward_propagate(model_inputs,self._weights)
-		gradients = self.backward_propagate(model_inputs,caches)
+		# we need method called update weights
+		for i in range(100):
+			cost, caches = self.forward_propagate(model_inputs,self._weights)
+			print(cost)
+			gradients = self.backward_propagate(model_inputs,caches)
+			self.update_adam(gradients,i+1,lr)
+
+
+	def update_adam(self,gradients,iteration,lr):
+		beta = 0.9
+		# repeat for each weight
+		for key in self._weights:
+			self._rms_velocity[key] = beta * self._rms_velocity[key] + ((1-beta) * np.square(gradients[key]))
+			rms_corrected = self._rms_velocity[key]/(1-math.pow(beta,iteration))
+			self._momentum_velocity[key] = beta * self._momentum_velocity[key] + ((1-beta) * gradients[key])
+			momentum_corrected = self._momentum_velocity[key]/(1-math.pow(beta,iteration))
+			self._weights[key] -= lr * momentum_corrected/np.sqrt(rms_corrected + 1e-8)
 
 
 	def forward_propagate(self,model_inputs,weights):
@@ -53,7 +70,6 @@ class CNN:
 		Z1, caches["Z1"] = conv_fast(x,weights["W1"],weights["B1"],{'pad':1,'stride':1})
 		
 		#insert batchnorm here
-
 		caches["A1"] = relu(Z1)
 		#(m,16,16,16)
 		Pool1, caches["Pool1"] = max_pooling(caches["A1"],2)
@@ -94,7 +110,7 @@ class CNN:
 		y = inputs['y']
 
 		gradients = {}
-		da4 = softmax_back(y,caches["A4"])
+		da4 = softmax_back(caches["A4"],y)
 		dz4,gradients["W4"],gradients["B4"] = fully_connected_backward(da4,caches["Z4"])
 		dz4_reshape = dz4.reshape(caches["Pool3"][0].shape)
 		da3 = max_pooling_back(dz4_reshape, caches["Pool3"])
@@ -158,7 +174,7 @@ class CNN:
 		cost1, caches1 = self.forward_propagate(inputs,weights1)
 		cost2, caches2 = self.forward_propagate(inputs,weights2)
 
-		return (cost2 - cost1) / (2. *epsilon)  
+		return (cost1 - cost2) / (2. *epsilon)  
 
 	def init_weights(self, method):
 		weights = {}
@@ -173,5 +189,10 @@ class CNN:
 
 		weights["W4"] = np.random.randn(128,10)/np.sqrt(128/2)
 		weights["B4"] = np.zeros(10)
+
+		# Init adam running means
+		for key in weights:
+			self._rms_velocity[key] = 0
+			self._momentum_velocity[key] = 0
 
 		return weights

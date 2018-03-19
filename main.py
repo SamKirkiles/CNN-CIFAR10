@@ -30,9 +30,12 @@ def main():
 
 
 	cnn_1 = CNN()	
-	model_inputs={'x':train_x_raw,'y':train_y_one_hot}
-	cnn_1.verify_gradients(model_inputs,True)
-		
+
+	grad_approx_inputs={'x':train_x_raw[0:2,...],'y':train_y_one_hot[0:2,...]}
+	cnn_1.verify_gradients(grad_approx_inputs,True)
+
+	train_inputs={'x':train_x_raw[0:32,...],'y':train_y_one_hot[0:32,...]}
+	cnn_1.train(train_inputs,0.001)
 
 
 if __name__ == "__main__":
