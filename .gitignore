@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+cifar_loader/data/CIFAR-10/
+
 # C extensions
 *.so
 

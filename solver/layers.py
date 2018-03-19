@@ -35,17 +35,17 @@ def conv_forward_naive(x,weight,b,parameters):
 
 def conv_back_naive(dout,cache):
 
-	x,w,b,pad,stride = cache
+	x,w_filter,b,pad,stride = cache
 
 	(m, n_h, n_w, n_C_prev) = x.shape
-	(f,f, n_C_prev, n_C) = w.shape
+	(f,f, n_C_prev, n_C) = w_filter.shape
 
 	n_H = int(1 + (n_h + 2 * pad - f) / stride)
 	n_W = int(1 + (n_w + 2 * pad - f) / stride)
 
-	a_prev_pad = np.pad(_input, ((0,0),(pad,pad),(pad,pad),(0,0)), 'constant', constant_values=0)
+	a_prev_pad = np.pad(x, ((0,0),(pad,pad),(pad,pad),(0,0)), 'constant', constant_values=0)
 
-	dw = np.zeros(w.shape,dtype=np.float32)
+	dw = np.zeros(w_filter.shape,dtype=np.float32)
 	dx = np.zeros(x.shape,dtype=np.float32)
 
 	for h in range(f):
@@ -70,14 +70,14 @@ def conv_back_naive(dout,cache):
 	                vert_end = vert_start + f
 	                horiz_start = w_output * stride
 	                horiz_end = horiz_start + f
-	                dx_pad[i,vert_start:vert_end,horiz_start:horiz_end,:] += _filter[:,:,:,g] * dout[i,h_output,w_output,g]
+	                dx_pad[i,vert_start:vert_end,horiz_start:horiz_end,:] += w_filter[:,:,:,g] * dout[i,h_output,w_output,g]
 	                                
 	            
 	dx = dx_pad[:,pad:pad+n_h,pad:pad+n_w,:]
 	            
 	db = np.sum(dout,axis=(0,1,2))
 
-	return dw,dx,db
+	return dx,dw,db
 
 def relu(x):
     return np.maximum(0, x)
@@ -120,6 +120,31 @@ def max_pooling(prev_layer, filter_size=2):
 	return pooling, caches
 
 
+def max_pooling_back(dout, caches):
+        
+    pool, prev, filter_size = caches
+
+    (m, n_H, n_W, channels) = pool.shape
+    (m_prev, n_prev_H, n_prev_W, channels_prev) = prev.shape
+    
+    empty = np.zeros((m, n_prev_H, n_prev_W, channels))
+    
+    for i in range(m):
+        for h in range(n_H):
+            for w in range(n_W):
+                for c in range(channels):
+                    
+                    vert_start = h*filter_size
+                    vert_end = vert_start + filter_size
+                    horiz_start = w*filter_size
+                    horiz_end = horiz_start + filter_size
+                                        
+                    mask = prev[i,vert_start:vert_end,horiz_start:horiz_end,c] == pool[i,h,w,c]
+     
+                    empty[i,vert_start:vert_end,horiz_start:horiz_end,c] = mask * dout[i,h,w,c]
+                    
+    return empty
+
 
 
 def fully_connected(prev_layer, w,b):
@@ -138,10 +163,14 @@ def fully_connected_backward(dout,caches):
 
     return da,dw,db
 
-def softmax_cost(y, y_hat,m):
+def softmax_cost(y, y_hat):
     return -np.sum(y * np.log(y_hat),axis=1)
 
 
 def softmax(z):
 	return np.exp(z)/np.sum(np.exp(z),axis=1,keepdims=True)
+
+def softmax_back(softmax, Y):    
+    return (softmax-Y)/softmax.shape[0]
+
 

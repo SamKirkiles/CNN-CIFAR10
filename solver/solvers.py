@@ -1,5 +1,7 @@
-from .layers import conv_forward_naive, relu, max_pooling, fully_connected, softmax, softmax_cost
+from .layers import conv_forward_naive, conv_back_naive, relu,relu_back, max_pooling, fully_connected, fully_connected_backward, softmax, softmax_cost, softmax_back,max_pooling_back
+from .layers_fast import conv_fast, conv_fast_back
 import numpy as np
+import copy as cp
 
 class CNN:
 	
@@ -36,7 +38,26 @@ class CNN:
 		print("Batch Size: " + str(batch_size))
 		print("Epochs: " + str(epochs))
 
-		self.forward_propagate(model_inputs,self._weights)
+		cost, caches = self.forward_propagate(model_inputs,self._weights)
+		gradients = self.backward_propagate(model_inputs,caches)
+
+	def verify_gradients(self,inputs,verbose=True):
+
+		cost, caches = self.forward_propagate(inputs,self._weights)
+		gradients = self.backward_propagate(inputs,caches)
+
+		if verbose:
+			print("Verifying gradients verbose:\n")
+
+		for key in self._weights:
+			approx = self.check_gradients(inputs,self._weights,key,self._weights[key].ndim)
+			calc = gradients[key].flat[0]
+
+			if verbose:
+				print("Approx " + key + ": " + str(approx))
+				print("Calulated " + key + ": " + str(calc))
+				print("Check Passed: " + str(np.isclose(approx,calc)))
+				print("\n")
 
 	def forward_propagate(self,model_inputs,weights):
 
@@ -80,7 +101,61 @@ class CNN:
 		#feed this into our softmax
 		caches["A4"] = softmax(Z4)
 
-		return caches
+		cost = np.mean(softmax_cost(y,caches["A4"]))
+
+		return cost, caches
+
+	def backward_propagate(self,inputs,caches):
+
+		x = inputs['x']
+		y = inputs['y']
+
+		gradients = {}
+		da4 = softmax_back(y,caches["A4"])
+		dz4,gradients["W4"],gradients["B4"] = fully_connected_backward(da4,caches["Z4"])
+		dz4_reshape = dz4.reshape(caches["Pool3"][0].shape)
+		da3 = max_pooling_back(dz4_reshape, caches["Pool3"])
+		dz3 = relu_back(caches["A3"],da3)
+		dz3,gradients["W3"],gradients["B3"] = conv_back_naive(dz3,caches["Z3"])
+		da2 = max_pooling_back(dz3, caches["Pool2"])
+		dz2 = relu_back(caches["A2"],da2)
+		dz2,gradients["W2"],gradients["B2"] = conv_back_naive(dz2,caches["Z2"])
+		da1 = max_pooling_back(dz2, caches["Pool1"])
+		dz1 = relu_back(caches["A1"],da1)
+		dz1,gradients["W1"],gradients["B1"] = conv_back_naive(dz1,caches["Z1"])
+
+		return gradients
+
+	def check_gradients(self,inputs,weights,key,dims):
+
+		x = inputs['x']
+		y = inputs['y']
+
+		epsilon = 0.00001
+
+		weights1 = cp.deepcopy(weights)
+		weights2 = cp.deepcopy(weights)
+
+		shape = (0)
+
+		if dims == 1:
+			shape = (0)
+		elif dims == 2:
+			shape = (0,0)
+		elif dims == 3:
+			shape = (0,0,0)
+		elif dims == 4:
+			shape = (0,0,0,0)
+		else:
+			raise ValueError('Dims must be less than 4')
+
+		weights1[key][shape] += epsilon
+		weights2[key][shape] -= epsilon
+
+		cost1, caches1 = self.forward_propagate(inputs,weights1)
+		cost2, caches2 = self.forward_propagate(inputs,weights2)
+
+		return (cost2 - cost1) / (2. *epsilon)  
 
 	def init_weights(self, method):
 		weights = {}

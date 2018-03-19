@@ -5,11 +5,6 @@ from solver.solvers import CNN
 
 def main():
 
-	# 1. create test training and cv data
-	# 2. initialize cnn
-	# 3. set layers of cnn
-	# 4. train
-
 	cifar10.maybe_download_and_extract()
 	train_x_raw, train_y, train_y_one_hot = cifar10.load_training_data()
 	test_x_raw, test_y, test_y_one_hot = cifar10.load_test_data()
@@ -23,9 +18,9 @@ def main():
 	train_y = train_y[0:49000,...]
 	train_y_one_hot=train_y_one_hot[0:49000,...]
 
-	train_x_raw = train_x_raw[0:100,...]
-	train_y = train_y[0:100,...]
-	train_y_one_hot = train_y_one_hot[0:100,...]
+	train_x_raw = train_x_raw[0:2,...]
+	train_y = train_y[0:2,...]
+	train_y_one_hot = train_y_one_hot[0:2,...]
 
 	train_mean = np.mean(train_x_raw )
 	train_max = np.max(train_x_raw )
@@ -35,7 +30,9 @@ def main():
 
 
 	cnn_1 = CNN()	
-	cnn_1.train(model_inputs={'x':train_x_raw,'y':train_y},lr=1e-3,epochs=5,batch_size=32)
+	model_inputs={'x':train_x_raw,'y':train_y_one_hot}
+	cnn_1.verify_gradients(model_inputs,True)
+		
 
 
 if __name__ == "__main__":
