@@ -8,6 +8,8 @@ cifar_loader/data/CIFAR-10/
 # C extensions
 *.so
 
+.DS_Store
+
 # Distribution / packaging
 .Python
 env/
