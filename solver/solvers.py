@@ -67,7 +67,7 @@ class CNN:
 		caches = {}
 
 		#(m,32,32,16)
-		Z1, caches["Z1"] = conv_forward_naive(x,weights["W1"],weights["B1"],{'pad':1,'stride':1})
+		Z1, caches["Z1"] = conv_fast(x,weights["W1"],weights["B1"],{'pad':1,'stride':1})
 		
 		#insert batchnorm here
 
@@ -76,7 +76,7 @@ class CNN:
 		Pool1, caches["Pool1"] = max_pooling(caches["A1"],2)
 		
 		#(m,16,16,16)
-		Z2, caches["Z2"] = conv_forward_naive(Pool1,weights["W2"],weights["B2"],{'pad':1,'stride':1})
+		Z2, caches["Z2"] = conv_fast(Pool1,weights["W2"],weights["B2"],{'pad':1,'stride':1})
 		
 		# insert batchnorm here
 
@@ -85,7 +85,7 @@ class CNN:
 		Pool2, caches["Pool2"] = max_pooling(caches["A2"],2)
 		
 		#(m,8,8,8)
-		Z3, caches["Z3"] = conv_forward_naive(Pool2,weights["W3"],weights["B3"],{'pad':1,'stride':1})
+		Z3, caches["Z3"] = conv_fast(Pool2,weights["W3"],weights["B3"],{'pad':1,'stride':1})
 
 		#insert batchnorm ehre
 
@@ -116,13 +116,13 @@ class CNN:
 		dz4_reshape = dz4.reshape(caches["Pool3"][0].shape)
 		da3 = max_pooling_back(dz4_reshape, caches["Pool3"])
 		dz3 = relu_back(caches["A3"],da3)
-		dz3,gradients["W3"],gradients["B3"] = conv_back_naive(dz3,caches["Z3"])
+		dz3,gradients["W3"],gradients["B3"] = conv_fast_back(dz3,caches["Z3"])
 		da2 = max_pooling_back(dz3, caches["Pool2"])
 		dz2 = relu_back(caches["A2"],da2)
-		dz2,gradients["W2"],gradients["B2"] = conv_back_naive(dz2,caches["Z2"])
+		dz2,gradients["W2"],gradients["B2"] = conv_fast_back(dz2,caches["Z2"])
 		da1 = max_pooling_back(dz2, caches["Pool1"])
 		dz1 = relu_back(caches["A1"],da1)
-		dz1,gradients["W1"],gradients["B1"] = conv_back_naive(dz1,caches["Z1"])
+		dz1,gradients["W1"],gradients["B1"] = conv_fast_back(dz1,caches["Z1"])
 
 		return gradients
 

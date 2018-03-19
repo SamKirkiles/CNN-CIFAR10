@@ -33,8 +33,14 @@ def im2col_flat(x,field_height,field_width,padding,stride):
     return x_padded[:,i,j,k],(i,j,k)
 
 
-def conv_fast(x,w_filter,b,padding=1,stride=1):
+def conv_fast(x,w_filter,b,parameters):
     
+
+    padding = parameters["pad"]
+    stride = parameters["stride"]
+
+    cache = (x,w_filter,b,padding,stride)
+
     
     N,H, W, C = x.shape
     
@@ -55,7 +61,7 @@ def conv_fast(x,w_filter,b,padding=1,stride=1):
                  
     #now the final reshape
     conv = conv.reshape(N,n_H,n_W,w_filter.shape[3])
-    return conv + b[None,None,None,:]
+    return conv + b[None,None,None,:], cache
 
 
 def col2im_flat(x_shape,dims,col,padding,stride):
@@ -78,7 +84,11 @@ def col2im_flat(x_shape,dims,col,padding,stride):
     return out
 
 
-def conv_fast_back(x,w_filter,dout,padding=1,stride=1):
+def conv_fast_back(dout,cache):
+
+
+    x,w_filter,b,padding,stride = cache
+
     
     f_h, f_w, c, f =  w_filter.shape
     
@@ -121,4 +131,4 @@ def conv_fast_back(x,w_filter,dout,padding=1,stride=1):
     
     db = np.sum(dout,axis=(0,1,2))
     
-    return dw,dx,db 
+    return dx,dw,db 
