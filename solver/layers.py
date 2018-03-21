@@ -194,8 +194,8 @@ def batchnorm_forward(x,gamma,beta,running_mu,running_sigma,run='train'):
 		y = gamma.reshape(1,1,1,c) * xhat + beta.reshape(1,1,1,c)
 
 		# Update moving averages 
-		running_mu = velocity * running_mu + (velocity - 1) * np.squeeze(mu)
-		running_sigma = velocity * running_sigma + (velocity - 1) * np.squeeze(sigma)
+		running_mu = velocity * running_mu + (1-velocity ) * np.squeeze(mu)
+		running_sigma = velocity * running_sigma + (1-velocity ) * np.squeeze(sigma)
 
 		cache = (x,mu,sigma,xhat,y,gamma,beta)
 

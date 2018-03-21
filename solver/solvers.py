@@ -3,6 +3,10 @@ from .layers_fast import conv_fast, conv_fast_back
 import numpy as np
 import copy as cp
 import math
+import os
+from terminaltables import AsciiTable
+import tensorflow as tf
+
 
 class CNN:
 	
@@ -23,30 +27,64 @@ class CNN:
 		self._bn_params = self.init_bn_params()
 
 
-		
+	def train(self,model_inputs,val_inputs,lr,epochs,batch_size,print_every=10):
 
-	def train(self,model_inputs,lr):
+		run_id = str(np.random.randint(1000))
 
-		print("\nTraining...")
-		print("Learning Rate" + str(lr))
+		print("\nTraining with run id:"  + run_id)
+		writer = tf.summary.FileWriter('out.graph/run_' + run_id,flush_secs=30, graph=tf.get_default_graph())
+
+		print("lr: " + str(lr))
+		print("epochs: " + str(epochs))
+		print("batch size: " + str(batch_size))
 
 		# we need method called update weights
-		for i in range(10):
-			cost, caches = self.forward_propagate(model_inputs,self._weights,self._params,self._bn_params)
-			print(cost)
-			gradients = self.backward_propagate(model_inputs,caches)
-			self.update_adam(gradients,i+1,lr)
+		i = 0
+
+		epoch_size = int(model_inputs["x"].shape[0]/batch_size)
+
+		for e in range(epochs):
+			for b in range(epoch_size):
+				batch_x = model_inputs["x"][batch_size*b:batch_size*(b+1),...]
+				batch_y = model_inputs["y"][batch_size*b:batch_size*(b+1),...]
+				batch_inputs = {"x":batch_x,"y":batch_y}
+				cost, caches = self.forward_propagate(batch_inputs,self._weights,self._params,self._bn_params)
+				gradients = self.backward_propagate(batch_inputs,caches)
+				self.update_adam(gradients,i+1,lr)
+
+
+				if i%print_every == 0:
+
+					summary = tf.Summary(value=[tf.Summary.Value(tag='cost',simple_value=cost)])
+					writer.add_summary(summary,i)
+
+					test_accuracy = self.test(val_inputs)
+
+					accuracy_summary = tf.Summary(value=[tf.Summary.Value(tag='Test Accuracy',simple_value=test_accuracy)])
+					writer.add_summary(accuracy_summary,i)
+
+					data = [["Progress","Mini Batch Cost", "Validation Accuracy"],[str(int(b/float(epoch_size)*100)) + "% " + str(e) + "/" + str(epochs),cost,str(test_accuracy) + "%"]]
+
+					table = AsciiTable(data)
+					table.title = "Stats run_" + run_id
+	        		
+					os.system('clear') 
+					print(table.table)
+					print("Printing every " + str(print_every) + " iterations") 
+
+				i+=1
+
+
+
 
 	def test(self,test_inputs):
 
-		print("\Testing...")
-
 		y = test_inputs['y']
 
-		cost, caches = self.forward_propagate(test_inputs,self._weights,self._params,self._bn_params)
+		cost, caches = self.forward_propagate(test_inputs,self._weights,self._params,self._bn_params,run='test')
 
-		accuracy = str(int(np.mean(y.argmax(axis=1) == caches["A4"].argmax(axis=1)) * 100)) + "%"
-		print(accuracy)
+		accuracy = int(np.mean(y.argmax(axis=1) == caches["A4"].argmax(axis=1)) * 100)
+		return accuracy
 
 	def update_adam(self,gradients,iteration,lr):
 		beta = 0.9
