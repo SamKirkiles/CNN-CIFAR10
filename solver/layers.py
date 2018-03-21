@@ -174,3 +174,61 @@ def softmax_back(softmax, Y):
     return (softmax-Y)/softmax.shape[0]
 
 
+def batchnorm_forward(x,gamma,beta,running_mu,running_sigma,run='train'):
+
+	# mean of x along each dimension
+	# Gamma is size of (C,)
+	# Beta is size of (C.)
+
+	m,h,w,c = x.shape
+	nt = (m*h*w)
+
+	velocity = 0.9
+
+	if run == 'train':
+		mu = (1./nt) * np.sum(x,axis=(0,1,2),keepdims = True)
+
+		sigma = (1./nt) * np.sum((x - mu) ** 2,axis=(0,1,2),keepdims=True)
+
+		xhat = (x - mu)/(np.sqrt(sigma+1e-8))
+		y = gamma.reshape(1,1,1,c) * xhat + beta.reshape(1,1,1,c)
+
+		# Update moving averages 
+		running_mu = velocity * running_mu + (velocity - 1) * np.squeeze(mu)
+		running_sigma = velocity * running_sigma + (velocity - 1) * np.squeeze(sigma)
+
+		cache = (x,mu,sigma,xhat,y,gamma,beta)
+
+	else:
+		mu = running_mu.reshape(1,1,1,c)
+		sigma = running_sigma.reshape(1,1,1,c)
+		xhat = (x - mu)/np.sqrt(sigma + 1e-8)
+		y = gamma.reshape(1,1,1,c) * xhat + beta.reshape(1,1,1,c)
+		cache = (x,mu,sigma,xhat,y,gamma,beta)
+
+	return xhat,running_mu,running_sigma, cache
+	
+
+def batchnorm_backward(dout,cache):
+
+	#computes the graidents for batchnorm
+
+	x,mu,sigma,xhat,y,gamma,beta = cache
+
+	m,h,w,c = x.shape
+	gamma =  gamma.reshape(1,1,1,c)
+
+	# derivatives directly from the paper
+
+	dbeta = np.sum(dout, axis=(0, 1, 2))
+	dgamma = np.sum(dout * xhat, axis=(0, 1, 2))
+
+	Nt = m*h*w
+	dxhat = dout * gamma
+	dsigma = np.sum(dxhat * (x-mu),axis=(0,1,2)).reshape(1,1,1,c) * -0.5 * (sigma+1e-8) ** -1.5
+	dmu = np.sum(dxhat * (-1.0/np.sqrt(sigma+1e-8)), axis=(0,1,2)).reshape(1,1,1,c) + dsigma * np.sum(-2 * (x-mu),axis=(0,1,2)).reshape(1,1,1,c)/Nt
+	dx = dxhat * (1.0/np.sqrt(sigma+1e-8)) + dsigma * (2.0* (x-mu))/Nt + dmu * (1./Nt)
+	
+	return dx,dgamma,dbeta
+
+

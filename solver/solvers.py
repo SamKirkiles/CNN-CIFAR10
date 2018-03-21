@@ -1,4 +1,4 @@
-from .layers import conv_forward_naive, conv_back_naive, relu,relu_back, max_pooling, fully_connected, fully_connected_backward, softmax, softmax_cost, softmax_back,max_pooling_back
+from .layers import conv_forward_naive, conv_back_naive, relu,relu_back, max_pooling, fully_connected, fully_connected_backward, softmax, softmax_cost, softmax_back,max_pooling_back,batchnorm_forward,batchnorm_backward
 from .layers_fast import conv_fast, conv_fast_back
 import numpy as np
 import copy as cp
@@ -7,31 +7,21 @@ import math
 class CNN:
 	
 	_weights = {}
+	_params = {}
+	_bn_params = {}
 
 	_rms_velocity = {}
 	_momentum_velocity = {}
 
 
-	### Convolution Parameters ###
-	conv_layers = 3
-	conv_pad = 1
-	conv_pad = 1
-
-	_activation = 'relu'
-
-	def __init__(self,conv_layers=3,fc_layers=1,activation='relu',init_method='xavier'):
-		"""
-			conv_layers: number of convolution layers
-		"""
-		self._conv_layers = conv_layers
-		self._activation = activation
-		self._init_method = init_method
+	def __init__(self):
 
 		print("Created a new CNN")
-		print("Convolution Layers: " + str(conv_layers))
-		print("Activation Fucntion: " + activation)
 
-		self._weights = self.init_weights(init_method)
+		self._weights = self.init_weights()
+		self._params = self.init_params()		
+		self._bn_params = self.init_bn_params()
+
 
 		
 
@@ -41,12 +31,22 @@ class CNN:
 		print("Learning Rate" + str(lr))
 
 		# we need method called update weights
-		for i in range(100):
-			cost, caches = self.forward_propagate(model_inputs,self._weights)
+		for i in range(10):
+			cost, caches = self.forward_propagate(model_inputs,self._weights,self._params,self._bn_params)
 			print(cost)
 			gradients = self.backward_propagate(model_inputs,caches)
 			self.update_adam(gradients,i+1,lr)
 
+	def test(self,test_inputs):
+
+		print("\Testing...")
+
+		y = test_inputs['y']
+
+		cost, caches = self.forward_propagate(test_inputs,self._weights,self._params,self._bn_params)
+
+		accuracy = str(int(np.mean(y.argmax(axis=1) == caches["A4"].argmax(axis=1)) * 100)) + "%"
+		print(accuracy)
 
 	def update_adam(self,gradients,iteration,lr):
 		beta = 0.9
@@ -58,8 +58,11 @@ class CNN:
 			momentum_corrected = self._momentum_velocity[key]/(1-math.pow(beta,iteration))
 			self._weights[key] -= lr * momentum_corrected/np.sqrt(rms_corrected + 1e-8)
 
+		for key in self._params:
+			self._params[key] -= lr * gradients[key]
 
-	def forward_propagate(self,model_inputs,weights):
+
+	def forward_propagate(self,model_inputs,weights,params,bn_params,run='train'):
 
 		x = model_inputs["x"]
 		y = model_inputs["y"]
@@ -69,26 +72,29 @@ class CNN:
 		#(m,32,32,16)
 		Z1, caches["Z1"] = conv_fast(x,weights["W1"],weights["B1"],{'pad':1,'stride':1})
 		
+		BN1,bn_params["running_mu_1"],bn_params["running_sigma_1"],caches["BN1"] = batchnorm_forward(Z1,params["gamma1"],params["beta1"],bn_params["running_mu_1"],bn_params["running_sigma_1"],run)
+
 		#insert batchnorm here
-		caches["A1"] = relu(Z1)
+		caches["A1"] = relu(BN1)
 		#(m,16,16,16)
 		Pool1, caches["Pool1"] = max_pooling(caches["A1"],2)
 		
 		#(m,16,16,16)
 		Z2, caches["Z2"] = conv_fast(Pool1,weights["W2"],weights["B2"],{'pad':1,'stride':1})
 		
-		# insert batchnorm here
+		BN2,bn_params["running_mu_2"],bn_params["running_sigma_2"],caches["BN2"] = batchnorm_forward(Z2,params["gamma2"],params["beta2"],bn_params["running_mu_2"],bn_params["running_sigma_2"],run)
 
-		caches["A2"] = relu(Z2)
+		caches["A2"] = relu(BN2)
 		#(m,8,8,16)
 		Pool2, caches["Pool2"] = max_pooling(caches["A2"],2)
 		
 		#(m,8,8,8)
 		Z3, caches["Z3"] = conv_fast(Pool2,weights["W3"],weights["B3"],{'pad':1,'stride':1})
 
-		#insert batchnorm ehre
 
-		caches["A3"] = relu(Z3)
+		BN3,bn_params["running_mu_3"],bn_params["running_sigma_3"],caches["BN3"] = batchnorm_forward(Z3,params["gamma3"],params["beta3"],bn_params["running_mu_3"],bn_params["running_sigma_3"],run)
+
+		caches["A3"] = relu(BN3)
 		#(m,4,4,8)
 		Pool3, caches["Pool3"] = max_pooling(caches["A3"],2)
 		
@@ -115,20 +121,28 @@ class CNN:
 		dz4_reshape = dz4.reshape(caches["Pool3"][0].shape)
 		da3 = max_pooling_back(dz4_reshape, caches["Pool3"])
 		dz3 = relu_back(caches["A3"],da3)
-		dz3,gradients["W3"],gradients["B3"] = conv_fast_back(dz3,caches["Z3"])
+
+		dbn3,gradients["gamma3"],gradients["beta3"] = batchnorm_backward(dz3,caches["BN3"])
+
+		dz3,gradients["W3"],gradients["B3"] = conv_fast_back(dbn3,caches["Z3"])
 		da2 = max_pooling_back(dz3, caches["Pool2"])
 		dz2 = relu_back(caches["A2"],da2)
-		dz2,gradients["W2"],gradients["B2"] = conv_fast_back(dz2,caches["Z2"])
+
+		dbn2,gradients["gamma2"],gradients["beta2"] = batchnorm_backward(dz2,caches["BN2"])
+
+		dz2,gradients["W2"],gradients["B2"] = conv_fast_back(dbn2,caches["Z2"])
 		da1 = max_pooling_back(dz2, caches["Pool1"])
 		dz1 = relu_back(caches["A1"],da1)
-		dz1,gradients["W1"],gradients["B1"] = conv_fast_back(dz1,caches["Z1"])
+		dbn1,gradients["gamma1"],gradients["beta1"] = batchnorm_backward(dz1,caches["BN1"])
+
+		dz1,gradients["W1"],gradients["B1"] = conv_fast_back(dbn1,caches["Z1"])
 
 		return gradients
 
 
 	def verify_gradients(self,inputs,verbose=True):
 
-		cost, caches = self.forward_propagate(inputs,self._weights)
+		cost, caches = self.forward_propagate(inputs,self._weights,self._params,self._bn_params)
 		gradients = self.backward_propagate(inputs,caches)
 
 		if verbose:
@@ -150,7 +164,7 @@ class CNN:
 		x = inputs['x']
 		y = inputs['y']
 
-		epsilon = 0.000001
+		epsilon = 0.0000001
 
 		weights1 = cp.deepcopy(weights)
 		weights2 = cp.deepcopy(weights)
@@ -171,12 +185,12 @@ class CNN:
 		weights1[key][shape] += epsilon
 		weights2[key][shape] -= epsilon
 
-		cost1, caches1 = self.forward_propagate(inputs,weights1)
-		cost2, caches2 = self.forward_propagate(inputs,weights2)
+		cost1, caches1 = self.forward_propagate(inputs,weights1,self._params,self._bn_params)
+		cost2, caches2 = self.forward_propagate(inputs,weights2,self._params,self._bn_params)
 
 		return (cost1 - cost2) / (2. *epsilon)  
 
-	def init_weights(self, method):
+	def init_weights(self):
 		weights = {}
 		weights["W1"] = np.random.randn(3,3,3,16)/np.sqrt(16384/2)
 		weights["B1"] = np.zeros(16)
@@ -196,3 +210,36 @@ class CNN:
 			self._momentum_velocity[key] = 0
 
 		return weights
+
+	def init_params(self):
+
+		params = {}
+
+		params["gamma1"] = np.ones(16)
+		params["beta1"] = np.zeros(16)
+
+
+		params["gamma2"] = np.ones(16)
+		params["beta2"] = np.zeros(16)
+
+
+		params["gamma3"] = np.ones(8)
+		params["beta3"] = np.zeros(8)
+
+		return params
+
+	def init_bn_params(self):
+		bn_params = {}
+
+		bn_params["running_mu_1"] = np.zeros(16)
+		bn_params["running_sigma_1"] = np.zeros(16)
+
+
+		bn_params["running_mu_2"] = np.zeros(16)
+		bn_params["running_sigma_2"] = np.zeros(16)
+
+
+		bn_params["running_mu_3"] = np.zeros(8)
+		bn_params["running_sigma_3"] = np.zeros(8)
+
+		return bn_params

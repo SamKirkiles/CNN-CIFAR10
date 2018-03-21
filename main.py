@@ -34,8 +34,11 @@ def main():
 	grad_approx_inputs={'x':train_x_raw[0:2,...],'y':train_y_one_hot[0:2,...]}
 	cnn_1.verify_gradients(grad_approx_inputs,True)
 
-	train_inputs={'x':train_x_raw[0:32,...],'y':train_y_one_hot[0:32,...]}
-	cnn_1.train(train_inputs,0.001)
+	train_inputs={'x':train_x_raw[0:100,...],'y':train_y_one_hot[0:100,...]}
+	cnn_1.train(train_inputs,0.01)
+
+	val_inputs={'x':train_x_validation,'y':train_y_one_hot_validation}
+	cnn_1.test(val_inputs)
 
 
 if __name__ == "__main__":
