@@ -41,7 +41,7 @@ def main():
 	val_inputs={'x':train_x_validation,'y':train_y_one_hot_validation}
 
 	# Train
-	cnn_1.train(train_inputs,val_inputs,0.01,epochs=1,batch_size=16)
+	cnn_1.train(train_inputs,val_inputs,0.001,epochs=5,batch_size=32)
 
 	cnn_1.test(val_inputs)
 

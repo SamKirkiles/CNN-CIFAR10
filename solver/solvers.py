@@ -6,6 +6,7 @@ import math
 import os
 from terminaltables import AsciiTable
 import tensorflow as tf
+from .augment import augment
 
 
 class CNN:
@@ -27,7 +28,7 @@ class CNN:
 		self._bn_params = self.init_bn_params()
 
 
-	def train(self,model_inputs,val_inputs,lr,epochs,batch_size,print_every=10):
+	def train(self,model_inputs,val_inputs,lr,epochs,batch_size,print_every=20):
 
 		run_id = str(np.random.randint(1000))
 
@@ -42,11 +43,24 @@ class CNN:
 		i = 0
 
 		epoch_size = int(model_inputs["x"].shape[0]/batch_size)
+		inputs_x = model_inputs["x"]
+		inputs_y = model_inputs["y"]
+
+		shuffle_index =np.arange(inputs_x.shape[0])
+		np.random.shuffle(shuffle_index)
 
 		for e in range(epochs):
+			# shuffle data
+			inputs_x = inputs_x[shuffle_index,...]
+			inputs_y = inputs_y[shuffle_index,...]
+
 			for b in range(epoch_size):
-				batch_x = model_inputs["x"][batch_size*b:batch_size*(b+1),...]
-				batch_y = model_inputs["y"][batch_size*b:batch_size*(b+1),...]
+				batch_x = inputs_x[batch_size*b:batch_size*(b+1),...]
+				batch_y = inputs_y[batch_size*b:batch_size*(b+1),...]
+
+				# augment random images from batch_x
+				batch_x = augment(batch_x)
+
 				batch_inputs = {"x":batch_x,"y":batch_y}
 				cost, caches = self.forward_propagate(batch_inputs,self._weights,self._params,self._bn_params)
 				gradients = self.backward_propagate(batch_inputs,caches)
