@@ -47,7 +47,6 @@ def conv_fast(x,w_filter,b,parameters):
     assert (H + 2 * padding - w_filter.shape[0]) % stride == 0
     assert (W + 2 * padding - w_filter.shape[1]) % stride == 0
 
-    
     n_H = int(((H - w_filter.shape[0]+ 2 * padding)/stride)+1)
     n_W = int(((W - w_filter.shape[1] + 2 * padding)/stride)+1)
 

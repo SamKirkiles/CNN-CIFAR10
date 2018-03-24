@@ -19,13 +19,20 @@ class CNN:
 	_momentum_velocity = {}
 
 
-	def __init__(self):
+	def __init__(self,file=None):
 
-		print("Created a new CNN")
+		print("\nInitialized CNN")
+		print("Weights from: " + str(file))
 
-		self._weights = self.init_weights()
-		self._params = self.init_params()		
-		self._bn_params = self.init_bn_params()
+		if file is not None:
+			self._weights,self._params,self._bn_params = self.load_model_from_file(file)
+		else:
+			self._weights = self.init_weights()
+			self._params = self.init_params()		
+			self._bn_params = self.init_bn_params()
+
+			self.save_model("save")
+
 
 
 	def train(self,model_inputs,val_inputs,lr,epochs,batch_size,print_every=20):
@@ -47,10 +54,12 @@ class CNN:
 		inputs_y = model_inputs["y"]
 
 		shuffle_index =np.arange(inputs_x.shape[0])
-		np.random.shuffle(shuffle_index)
 
 		for e in range(epochs):
 			# shuffle data
+			shuffle_index =np.arange(inputs_x.shape[0])
+			np.random.shuffle(shuffle_index)
+			
 			inputs_x = inputs_x[shuffle_index,...]
 			inputs_y = inputs_y[shuffle_index,...]
 
@@ -59,7 +68,7 @@ class CNN:
 				batch_y = inputs_y[batch_size*b:batch_size*(b+1),...]
 
 				# augment random images from batch_x
-				batch_x = augment(batch_x)
+				#batch_x = augment(batch_x)
 
 				batch_inputs = {"x":batch_x,"y":batch_y}
 				cost, caches = self.forward_propagate(batch_inputs,self._weights,self._params,self._bn_params)
@@ -72,12 +81,12 @@ class CNN:
 					summary = tf.Summary(value=[tf.Summary.Value(tag='cost',simple_value=cost)])
 					writer.add_summary(summary,i)
 
-					test_accuracy = self.test(val_inputs)
+					validation_accuracy,_ = self.eval(val_inputs)
 
-					accuracy_summary = tf.Summary(value=[tf.Summary.Value(tag='Test Accuracy',simple_value=test_accuracy)])
+					accuracy_summary = tf.Summary(value=[tf.Summary.Value(tag='Validation Accuracy',simple_value=validation_accuracy)])
 					writer.add_summary(accuracy_summary,i)
 
-					data = [["Progress","Mini Batch Cost", "Validation Accuracy"],[str(int(b/float(epoch_size)*100)) + "% " + str(e) + "/" + str(epochs),cost,str(test_accuracy) + "%"]]
+					data = [["Progress","Mini Batch Cost", "Validation Accuracy"],[str(int(b/float(epoch_size)*100)) + "% " + str(e) + "/" + str(epochs),cost,str(validation_accuracy) + "%"]]
 
 					table = AsciiTable(data)
 					table.title = "Stats run_" + run_id
@@ -89,16 +98,42 @@ class CNN:
 				i+=1
 
 
+		print("Saving weights...")
+		self.save_model("final_weights_"+run_id)
 
 
-	def test(self,test_inputs):
 
-		y = test_inputs['y']
 
-		cost, caches = self.forward_propagate(test_inputs,self._weights,self._params,self._bn_params,run='test')
 
-		accuracy = int(np.mean(y.argmax(axis=1) == caches["A4"].argmax(axis=1)) * 100)
-		return accuracy
+	def eval(self,inputs,batches=None):
+		x = inputs['x']
+		y = inputs['y']
+
+		if batches is not None:
+
+			epoch = int(y.shape[0]/batches)
+
+			averages = np.array([])
+			for b in range(epoch):
+
+				batch_x = x[b*batches:(b+1)*batches,...]
+				batch_y = y[b*batches:(b+1)*batches,...]
+				batch_input = {"x":batch_x,"y":batch_y}
+
+				cost, caches = self.forward_propagate(batch_input,self._weights,self._params,self._bn_params,run='test')
+
+				accuracy = int(np.mean(batch_y.argmax(axis=1) == caches["A4"].argmax(axis=1)) * 100)
+				averages = np.append(averages,accuracy)
+
+			out = caches['A4']
+			accuracy = np.mean(averages)
+		else:
+			cost, caches = self.forward_propagate(inputs,self._weights,self._params,self._bn_params,run='test')
+
+			out = caches['A4']
+			accuracy = int(np.mean(y.argmax(axis=1) == caches["A4"].argmax(axis=1)) * 100)
+
+		return accuracy,out
 
 	def update_adam(self,gradients,iteration,lr):
 		beta = 0.9
@@ -121,41 +156,34 @@ class CNN:
 
 		caches = {}
 
-		#(m,32,32,16)
 		Z1, caches["Z1"] = conv_fast(x,weights["W1"],weights["B1"],{'pad':1,'stride':1})
 		
 		BN1,bn_params["running_mu_1"],bn_params["running_sigma_1"],caches["BN1"] = batchnorm_forward(Z1,params["gamma1"],params["beta1"],bn_params["running_mu_1"],bn_params["running_sigma_1"],run)
 
-		#insert batchnorm here
 		caches["A1"] = relu(BN1)
-		#(m,16,16,16)
+
 		Pool1, caches["Pool1"] = max_pooling(caches["A1"],2)
 		
-		#(m,16,16,16)
 		Z2, caches["Z2"] = conv_fast(Pool1,weights["W2"],weights["B2"],{'pad':1,'stride':1})
 		
 		BN2,bn_params["running_mu_2"],bn_params["running_sigma_2"],caches["BN2"] = batchnorm_forward(Z2,params["gamma2"],params["beta2"],bn_params["running_mu_2"],bn_params["running_sigma_2"],run)
 
 		caches["A2"] = relu(BN2)
-		#(m,8,8,16)
+
 		Pool2, caches["Pool2"] = max_pooling(caches["A2"],2)
 		
-		#(m,8,8,8)
 		Z3, caches["Z3"] = conv_fast(Pool2,weights["W3"],weights["B3"],{'pad':1,'stride':1})
-
 
 		BN3,bn_params["running_mu_3"],bn_params["running_sigma_3"],caches["BN3"] = batchnorm_forward(Z3,params["gamma3"],params["beta3"],bn_params["running_mu_3"],bn_params["running_sigma_3"],run)
 
 		caches["A3"] = relu(BN3)
-		#(m,4,4,8)
+
 		Pool3, caches["Pool3"] = max_pooling(caches["A3"],2)
 		
-		#(m,512)
 		pool3_reshape = Pool3.reshape(Pool3.shape[0],Pool3.shape[1] * Pool3.shape[2] * Pool3.shape[3])
 		
 		Z4, caches["Z4"] = fully_connected(pool3_reshape,weights["W4"],weights["B4"])
 
-		#feed this into our softmax
 		caches["A4"] = softmax(Z4)
 
 		cost = np.mean(softmax_cost(y,caches["A4"]))
@@ -295,3 +323,68 @@ class CNN:
 		bn_params["running_sigma_3"] = np.zeros(8)
 
 		return bn_params
+
+
+	def save_model(self,filename):
+		model = {}
+
+		for weight in self._weights:
+			model[weight] = self._weights[weight]
+
+		for param in self._params:
+			model[param] = self._params[param]
+
+		for bn in self._bn_params:
+			model[bn] = self._bn_params[bn]
+
+
+		np.save(filename + '.npy',model)
+		print("Successfully saved weights")
+
+
+
+	def load_model_from_file(self,filename):
+		weights = {}
+		params = {}
+		bn_params = {}
+
+		data_load = np.load(filename + '.npy').item()
+
+
+		weights["W1"] = data_load.get('W1')
+		weights["W2"] = data_load.get('W2')
+		weights["W3"] = data_load.get('W3')
+		weights["W4"] = data_load.get('W4')
+	    
+		weights["B1"] = data_load.get('B1')
+		weights["B2"] = data_load.get('B2')
+		weights["B3"] = data_load.get('B3')
+		weights["B4"] = data_load.get('B4')
+
+
+		params["gamma1"] = data_load.get('gamma1')
+		params["beta1"] = data_load.get('beta1')
+
+		params["gamma2"] = data_load.get('gamma2')
+		params["beta2"] = data_load.get('beta2')
+
+		params["gamma3"] = data_load.get('gamma3')
+		params["beta3"] = data_load.get('beta3')
+
+
+		bn_params["running_mu_1"] = data_load.get('running_mu_1')
+		bn_params["running_sigma_1"] = data_load.get('running_sigma_1')
+
+		bn_params["running_mu_2"] = data_load.get('running_mu_2')
+		bn_params["running_sigma_2"] = data_load.get('running_sigma_2')
+
+		bn_params["running_mu_3"] = data_load.get('running_mu_3')
+		bn_params["running_sigma_3"] = data_load.get('running_sigma_3')
+
+		for key in weights:
+			self._rms_velocity[key] = 0
+			self._momentum_velocity[key] = 0
+
+
+		return weights,params,bn_params
+
