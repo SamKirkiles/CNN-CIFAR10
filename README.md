@@ -4,7 +4,7 @@ A convolutional nerual net trained from scratch in pure python/numpy on the CIFA
 
 ![CIFAR-10](https://i.imgur.com/YO0GtpU.png)
 
-**Here is a list of some features I implemented for faster accuracy:**
+**Here is a list of some features I implemented for faster training:**
 
 * Adam optimization algorithm
 * Batchnorm after every convolution
