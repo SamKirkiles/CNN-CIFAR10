@@ -3,3 +3,4 @@ A convolutional nerual net trained from scratch in pure python/numpy on the CIFA
 
 ![CIFAR-10](https://i.imgur.com/YO0GtpU.png)
 
+![Example Classification](https://i.imgur.com/whl7Xrb.png)
