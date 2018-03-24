@@ -4,6 +4,10 @@ A convolutional nerual net trained from scratch in pure python/numpy on the CIFA
 
 ![CIFAR-10](https://i.imgur.com/YO0GtpU.png)
 
+I used Tensorboard without Tensorflow for graphing accuracy and cost during training. This information is written to the out.graph file.
+
+Clone the repository and run `python main.py ` after installing dependencies. The CIFAR 10 dataset should download into the correct folder automatically. There are some boolean variables at the top of the main.py which can be set to switch between training and testing.
+
 **Here is a list of some features I implemented for faster training:**
 
 * Adam optimization algorithm
