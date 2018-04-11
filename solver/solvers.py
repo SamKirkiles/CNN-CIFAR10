@@ -5,6 +5,7 @@ import copy as cp
 import math
 import os
 from terminaltables import AsciiTable
+# import tensorflow to access tensorbaord 
 import tensorflow as tf
 from .augment import augment
 
